@@ -1,0 +1,72 @@
+{
+    "bot_words": {
+        "description": "人机关键词",
+        "type": "list",
+        "hint": "找人机时，用户消息含有这些字符时会被标记被人机",
+        "default": [
+            "#",
+            "/",
+            ".",
+            ":",
+            "~",
+            "（",
+            "）",
+            "(",
+            ")",
+            "[",
+            "]",
+            "{",
+            "}"
+        ]
+    },
+    "test_cmds": {
+        "description": "测试人机用的命令",
+        "type": "list",
+        "hint": "",
+        "default": [
+            "/help",
+            "#help",
+            "-help",
+            "。help"
+        ]
+    },
+    "test_interval": {
+        "description": "发送测试命令的时间间隔",
+        "type": "int",
+        "hint": "单位为秒",
+        "default": 2
+    },
+    "ban_sleep": {
+        "description": "通融时间(暂时是无效配置)",
+        "type": "int",
+        "hint": "单位为秒",
+        "default": 3
+    },
+    "speak_threshold": {
+        "description": "发言间隔限制",
+        "type": "int",
+        "hint": "单位为秒",
+        "default": 20
+    },
+    "max_length": {
+        "description": "消息最大长度",
+        "type": "int",
+        "hint": "人机发言超过此长度时会被禁言并撤回",
+        "default": 150
+    },
+    "ban_duration": {
+        "description": "禁言时长",
+        "type": "int",
+        "hint": "单位为秒",
+        "default": 1800
+    },
+    "bot_data_list": {
+        "description": "人机数据",
+        "type": "list",
+        "hint": "",
+        "obvious_hint": false,
+        "default": [
+            {}
+        ]
+    }
+}
