@@ -70,7 +70,7 @@
         "description": "人机数据",
         "type": "list",
         "hint": "存储着所有群聊的人机数据，请不要轻易删除数据，删除后所有状态重置",
-        "obvious_hint": false,
+        "invisible": true,
         "default": [
             {}
         ]
