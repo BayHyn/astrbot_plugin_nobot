@@ -1,4 +1,21 @@
-{
+{   
+    "monitoring_groups": {
+        "description": "监控群",
+        "type": "list",
+        "hint": "监控这些群，如果人机发言超过限制，会被禁言",
+        "default": []
+    },
+    "test_cmds": {
+        "description": "测试人机用的命令",
+        "type": "list",
+        "hint": "执行“找人机”命令时，bot会用这些指令勾引其他人机发言",
+        "default": [
+            "/help",
+            "#help",
+            "-help",
+            "。help"
+        ]
+    },
     "bot_words": {
         "description": "人机关键词",
         "type": "list",
@@ -19,51 +36,40 @@
             "}"
         ]
     },
-    "test_cmds": {
-        "description": "测试人机用的命令",
-        "type": "list",
-        "hint": "",
-        "default": [
-            "/help",
-            "#help",
-            "-help",
-            "。help"
-        ]
-    },
     "test_interval": {
         "description": "发送测试命令的时间间隔",
         "type": "int",
         "hint": "单位为秒",
         "default": 2
     },
-    "ban_sleep": {
-        "description": "通融时间(暂时是无效配置)",
+    "max_length": {
+        "description": "消息最大长度限制",
         "type": "int",
-        "hint": "单位为秒",
-        "default": 3
+        "hint": "发言规则一：人机发言超过此长度时会被禁言并撤回（单位为字）",
+        "default": 150
     },
     "speak_threshold": {
-        "description": "发言间隔限制",
+        "description": "发言间隔时间限制",
         "type": "int",
-        "hint": "单位为秒",
+        "hint": "发言规则二：人机前后两次发言间隔小于此值时会被禁言并撤回（单位为秒）",
         "default": 20
-    },
-    "max_length": {
-        "description": "消息最大长度",
-        "type": "int",
-        "hint": "人机发言超过此长度时会被禁言并撤回",
-        "default": 150
     },
     "ban_duration": {
         "description": "禁言时长",
         "type": "int",
-        "hint": "单位为秒",
+        "hint": "人机发言违规时被禁言的时长（单位为秒）",
         "default": 1800
+    },
+    "ban_sleep": {
+        "description": "通融时间",
+        "type": "int",
+        "hint": "当机器人是被@唤醒时，人机检测程序会睡眠一段时间，给人机发言的机会（单位为秒）",
+        "default": 3
     },
     "bot_data_list": {
         "description": "人机数据",
         "type": "list",
-        "hint": "",
+        "hint": "存储着所有群聊的人机数据，请不要轻易删除数据，删除后所有状态重置",
         "obvious_hint": false,
         "default": [
             {}

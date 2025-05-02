@@ -6,29 +6,28 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
 import astrbot.api.message_components as Comp
 from astrbot.api.event import filter
 from .manager import BotManager
+from astrbot.core.utils.session_waiter import (
+    session_waiter,
+    SessionController,
+)
+from astrbot import logger
 
 
 @register(
     "astrbot_plugin_nobot",
     "Zhalslar",
     "人机去死！找出并禁言群里的人机!",
-    "1.0.0",
+    "1.0.1",
     "https://github.com/Zhalslar/astrbot_plugin_nobot",
 )
 class NobotPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        # 人机数据
-        bot_data_list: list[dict] = config.get("bot_data_list", {})
-        bot_data = bot_data_list[0] if bot_data_list else {}
-        # 人机管理器
-        self.bm = BotManager(bot_data, config)
+        self.config = config
         # 测试人机用的命令列表
         self.test_cmds: list[str] = config.get("test_cmds", ["/help"])
         # 测试命令发送的时间间隔(秒)
         self.test_interval: int = config.get("test_interval", 2)
-        # 人机被at或被reply时，禁言程序进入睡眠的时长
-        self.ban_sleep: int = config.get("ban_sleep", 3)
         # 找人机命令执行中，用户消息包含以下字符会被标记为人机
         self.bot_words: list[str] = config.get("bot_words", [])
         # 发言间隔限制（秒）
@@ -37,6 +36,15 @@ class NobotPlugin(Star):
         self.max_length: int = config.get("max_length", 150)
         # 禁言时长（秒）
         self.ban_duration: int = config.get("ban_duration", 1800)
+        # 通融时间
+        self.ban_sleep = config.get("ban_sleep", 3)
+        # 监控人机的群聊
+        self.monitoring_groups: list[str] = config.get("monitoring_groups", [])
+        # 人机数据
+        bot_data_list: list[dict] = config.get("bot_data_list", {})
+        bot_data = bot_data_list[0] if bot_data_list else {}
+        # 人机管理器
+        self.bm = BotManager(bot_data, config)
 
     @staticmethod
     async def _get_name(event: AstrMessageEvent, user_id: str | int):
@@ -65,13 +73,15 @@ class NobotPlugin(Star):
             for seg in messages
             if (isinstance(seg, Comp.At) and str(seg.qq) != self_id)
         ]
+
     @staticmethod
     async def ban(event: AstrMessageEvent, user_id: str | int, duration: int = 0):
-        """执行禁言并撤回的操作"""
+        """禁言/解禁"""
         if event.get_platform_name() == "aiocqhttp":
             from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
                 AiocqhttpMessageEvent,
             )
+
             assert isinstance(event, AiocqhttpMessageEvent)
             client = event.bot
             group_id = event.get_group_id()
@@ -83,9 +93,10 @@ class NobotPlugin(Star):
                 )
             except:  # noqa: E722
                 return
+
     @staticmethod
     async def delete_msg(event: AstrMessageEvent):
-        """执行禁言并撤回的操作"""
+        """撤回消息"""
         if event.get_platform_name() == "aiocqhttp":
             from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
                 AiocqhttpMessageEvent,
@@ -99,19 +110,24 @@ class NobotPlugin(Star):
             except:  # noqa: E722
                 return
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("开启人机禁言")
     async def start_ban(self, event: AstrMessageEvent):
         group_id = event.get_group_id()
-        self.bm.toggle_ban(group_id, True)
+        self.monitoring_groups.append(group_id)
         yield event.plain_result("已开启人机禁言")
+        self.config.save_config()
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("关闭人机禁言")
     async def stop_ban(self, event: AstrMessageEvent):
         group_id = event.get_group_id()
-        self.bm.toggle_ban(group_id, False)
+        self.monitoring_groups.remove(group_id)
         yield event.plain_result("已关闭人机禁言")
+        self.config.save_config()
 
-    @filter.command("标记人机")
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("标记人机", alias={"杀"})
     async def label_bot(self, event: AstrMessageEvent):
         """标记人机"""
         group_id = event.get_group_id()
@@ -123,7 +139,8 @@ class NobotPlugin(Star):
                 bot_name = await self._get_name(event, bot_id)
                 yield event.plain_result(f"已将【{bot_name}】标记为人机")
 
-    @filter.command("取消标记",alias={"救"})
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("取消标记", alias={"救"})
     async def unlabel_bot(self, event: AstrMessageEvent):
         """取消人机标记"""
         group_id = event.get_group_id()
@@ -145,44 +162,66 @@ class NobotPlugin(Star):
         )
         yield event.plain_result(f"{bot_names}")
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("找人机")
-    async def find_bot(self, event: AstrMessageEvent):
-        group_id = event.get_group_id()
-        self.bm._get_or_create_group(group_id)
-        # 重复触发则停止
-        if self.bm.is_monitoring(group_id):
-            self.bm.toggle_monitoring(group_id, False)
-            yield event.plain_result("催什么催！不找了！")
-        # 启动监控
-        self.bm.toggle_monitoring(group_id, True)
-        for cmd in self.test_cmds:
-            if self.bm.is_monitoring(group_id) is False:
-                return
-            yield event.plain_result(cmd)
-            await asyncio.sleep(self.test_interval)
-        self.bm.toggle_monitoring(group_id, False)
-        yield event.plain_result("找完了")
+    async def handle_empty_mention(self, event: AstrMessageEvent):
+        """找出群里的人机"""
+        timeout = self.test_interval * (len(self.test_cmds) + 1)
 
-    @filter.event_message_type(EventMessageType.GROUP_MESSAGE)
-    async def meme_handle(self, event: AstrMessageEvent):
-        """找人机时，监控谁是人机"""
-        group_id = event.get_group_id()
-        user_id = event.get_sender_id()
-        if not self.bm.is_monitoring(group_id):
-            return
-
-        message_str = event.get_message_str()
-        if len(message_str) > self.max_length:
-            self.bm.add_bot_record(group_id, user_id)
+        @session_waiter(timeout=timeout, record_history_chains=False)  # type: ignore
+        async def empty_mention_waiter(
+            controller: SessionController, event: AstrMessageEvent
+        ):
+            chain = event.get_messages()
+            message_str = event.message_str
+            group_id = event.get_group_id()
+            user_id = event.get_sender_id()
             bot_name = await self._get_name(event, user_id)
-            yield event.plain_result(f"【{bot_name}】话太多了，已标记为人机")
-        else:
-            for word in self.bot_words:
-                if word in message_str:
-                    self.bm.add_bot_record(group_id, user_id)
-                    bot_name = await self._get_name(event, user_id)
-                    yield event.plain_result(f"【{bot_name}】言语中含有人机特征，已标记为人机")
 
+            reply = f"{bot_name}别乱发消息，小心被标成人机"
+
+            if chain and isinstance(chain[0], Comp.Reply):
+                self.bm.add_bot_record(group_id, user_id)
+                reply = f"【{bot_name}】合并转发了消息，已标记为人机"
+
+            elif len(message_str) > self.max_length:
+                self.bm.add_bot_record(group_id, user_id)
+                reply = f"【{bot_name}】话太多了，已标记为人机"
+
+            elif message_str:
+                for word in self.bot_words:
+                    if word in message_str:
+                        self.bm.add_bot_record(group_id, user_id)
+                        bot_name = await self._get_name(event, user_id)
+                        reply = f"【{bot_name}】言语中含有人机特征，已标记为人机"
+                        break
+
+            message_result = event.make_result()
+            message_result.chain = [Comp.Plain(reply)]
+            await event.send(message_result)
+
+            controller.keep(timeout=0, reset_timeout=False)
+
+        async def run_empty_mention_waiter():
+            try:
+                await empty_mention_waiter(event)
+            except TimeoutError as _:
+                message_result = event.make_result()
+                message_result.chain = [Comp.Plain("找完了")]
+                await event.send(message_result)
+            except Exception as e:
+                logger.error("handle_empty_mention error: " + str(e))
+            finally:
+                event.stop_event()
+
+        async def run_test_cmds():
+            for cmd in self.test_cmds:
+                message_result = event.make_result()
+                message_result.chain = [Comp.Plain(f"{cmd}")]
+                await event.send(message_result)
+                await asyncio.sleep(self.test_interval)
+
+        await asyncio.gather(run_empty_mention_waiter(), run_test_cmds())
 
     @filter.event_message_type(EventMessageType.GROUP_MESSAGE)
     async def handle_msg(self, event: AstrMessageEvent):
@@ -190,23 +229,34 @@ class NobotPlugin(Star):
         group_id = event.get_group_id()
         user_id = event.get_sender_id()
 
-        # 检查用户是否在当前群聊的人机列表中
-        if group_id not in self.bm.get_groups() or user_id not in self.bm.get_bot_ids(
-            group_id
+        # 检查群聊是否在监控列表中以及用户是否为人机
+        if (
+            group_id not in self.monitoring_groups
+            or group_id not in self.bm.get_groups()
+            or user_id not in self.bm.get_bot_ids(group_id)
         ):
             return
 
-        # 检查消息长度
+        # 过滤空消息
         message_str = event.get_message_str()
+        if len(message_str) == 0:
+            return
+
+        # 通融机制
+        chain = event.get_messages()
+        if chain and isinstance(chain[0], Comp.At):
+            await asyncio.sleep(self.ban_sleep)
+
+        # 检查消息长度
         if len(message_str) > self.max_length:
             yield event.plain_result("干嘛发这么长的文本！")
             await self.delete_msg(event)
-            await self.ban(event,user_id, self.ban_duration)
+            await self.ban(event, user_id, self.ban_duration)
             return
 
         # 检查发言频率、同时更新发言时间
         if self.bm.check_speak_frequency(group_id, user_id, self.speak_threshold):
             event.stop_event()
             await self.delete_msg(event)
-            await self.ban(event,user_id, self.ban_duration)
+            await self.ban(event, user_id, self.ban_duration)
             return
