@@ -45,14 +45,20 @@
     "max_length": {
         "description": "消息最大长度限制",
         "type": "int",
-        "hint": "发言规则一：人机发言超过此长度时会被禁言并撤回（单位为字）",
+        "hint": "发言规则一：人机发言超过此长度时会被禁言（单位为字）",
         "default": 150
     },
     "speak_threshold": {
         "description": "发言间隔时间限制",
         "type": "int",
-        "hint": "发言规则二：人机前后两次发言间隔小于此值时会被禁言并撤回（单位为秒）",
+        "hint": "发言规则二：人机前后两次发言间隔小于此值时会被禁言（单位为秒）",
         "default": 20
+    },
+    "is_delete_msg": {
+        "description": "是否撤回消息",
+        "type": "bool",
+        "hint": "是否在禁言人机的同时，撤回人机发的消息",
+        "default": false
     },
     "ban_duration": {
         "description": "禁言时长",

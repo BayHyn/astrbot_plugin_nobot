@@ -16,7 +16,7 @@ from astrbot import logger
 @register(
     "astrbot_plugin_nobot",
     "Zhalslar",
-    "人机去死！找出并禁言群里的人机!",
+    "找出并禁言群里的人机!",
     "1.0.1",
     "https://github.com/Zhalslar/astrbot_plugin_nobot",
 )
@@ -30,12 +30,14 @@ class NobotPlugin(Star):
         self.test_interval: int = config.get("test_interval", 2)
         # 找人机命令执行中，用户消息包含以下字符会被标记为人机
         self.bot_words: list[str] = config.get("bot_words", [])
-        # 发言间隔限制（秒）
+        # 人机发言间隔限制（秒）
         self.speak_threshold: int = config.get("speak_threshold", 20)
         # 消息最大长度
         self.max_length: int = config.get("max_length", 150)
         # 禁言时长（秒）
         self.ban_duration: int = config.get("ban_duration", 1800)
+        # 禁言时是否同时撤回消息
+        self.is_delete_msg: bool = config.get("is_delete_msg", True)
         # 通融时间
         self.ban_sleep = config.get("ban_sleep", 3)
         # 监控人机的群聊
@@ -115,7 +117,7 @@ class NobotPlugin(Star):
     async def start_ban(self, event: AstrMessageEvent):
         group_id = event.get_group_id()
         self.monitoring_groups.append(group_id)
-        yield event.plain_result("已开启人机禁言")
+        yield event.plain_result("本群已开启人机禁言")
         self.config.save_config()
 
     @filter.permission_type(filter.PermissionType.ADMIN)
@@ -123,7 +125,7 @@ class NobotPlugin(Star):
     async def stop_ban(self, event: AstrMessageEvent):
         group_id = event.get_group_id()
         self.monitoring_groups.remove(group_id)
-        yield event.plain_result("已关闭人机禁言")
+        yield event.plain_result("本群已关闭人机禁言")
         self.config.save_config()
 
     @filter.permission_type(filter.PermissionType.ADMIN)
@@ -190,6 +192,7 @@ class NobotPlugin(Star):
 
             elif message_str:
                 for word in self.bot_words:
+
                     if word in message_str:
                         self.bm.add_bot_record(group_id, user_id)
                         bot_name = await self._get_name(event, user_id)
@@ -227,19 +230,14 @@ class NobotPlugin(Star):
     async def handle_msg(self, event: AstrMessageEvent):
         """强制控制人机发言"""
         group_id = event.get_group_id()
-        user_id = event.get_sender_id()
+        sender_id = event.get_sender_id()
 
         # 检查群聊是否在监控列表中以及用户是否为人机
         if (
             group_id not in self.monitoring_groups
             or group_id not in self.bm.get_groups()
-            or user_id not in self.bm.get_bot_ids(group_id)
+            or sender_id not in self.bm.get_bot_ids(group_id)
         ):
-            return
-
-        # 过滤空消息
-        message_str = event.get_message_str()
-        if len(message_str) == 0:
             return
 
         # 通融机制
@@ -248,15 +246,17 @@ class NobotPlugin(Star):
             await asyncio.sleep(self.ban_sleep)
 
         # 检查消息长度
-        if len(message_str) > self.max_length:
+        if len(event.message_str) > self.max_length:
             yield event.plain_result("干嘛发这么长的文本！")
-            await self.delete_msg(event)
-            await self.ban(event, user_id, self.ban_duration)
+            if self.is_delete_msg:
+                await self.delete_msg(event)
+            await self.ban(event, sender_id, self.ban_duration)
             return
 
         # 检查发言频率、同时更新发言时间
-        if self.bm.check_speak_frequency(group_id, user_id, self.speak_threshold):
+        if self.bm.check_speak_frequency(group_id, sender_id, self.speak_threshold):
             event.stop_event()
-            await self.delete_msg(event)
-            await self.ban(event, user_id, self.ban_duration)
+            if self.is_delete_msg:
+                await self.delete_msg(event)
+            await self.ban(event, sender_id, self.ban_duration)
             return
