@@ -1,6 +1,7 @@
 import asyncio
 from astrbot.api.star import Context, Star, register
 from astrbot.core.config.astrbot_config import AstrBotConfig
+from astrbot.core.message.components import At, Forward, Image, Plain, Record, Reply, Video
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
 from astrbot.core.star.filter.event_message_type import EventMessageType
 import astrbot.api.message_components as Comp
@@ -17,7 +18,7 @@ from astrbot import logger
     "astrbot_plugin_nobot",
     "Zhalslar",
     "找出并禁言群里的人机!",
-    "1.0.1",
+    "1.0.2",
     "https://github.com/Zhalslar/astrbot_plugin_nobot",
 )
 class NobotPlugin(Star):
@@ -192,7 +193,6 @@ class NobotPlugin(Star):
 
             elif message_str:
                 for word in self.bot_words:
-
                     if word in message_str:
                         self.bm.add_bot_record(group_id, user_id)
                         bot_name = await self._get_name(event, user_id)
@@ -229,9 +229,24 @@ class NobotPlugin(Star):
     @filter.event_message_type(EventMessageType.GROUP_MESSAGE)
     async def handle_msg(self, event: AstrMessageEvent):
         """强制控制人机发言"""
+        raw_message = getattr(event.message_obj, "raw_message", None)
+
+        if not (
+            raw_message
+            and isinstance(raw_message, dict)
+            and event.message_obj.message
+            and isinstance(
+                event.message_obj.message[0], (Plain, Image, Record, Video, Forward, Reply, At)
+            )
+        ):
+            return
+
+        role = raw_message.get("sender", {}).get("role")
+        if role in ["owner", "admin"]:
+            return
+
         group_id = event.get_group_id()
         sender_id = event.get_sender_id()
-
         # 检查群聊是否在监控列表中以及用户是否为人机
         if (
             group_id not in self.monitoring_groups
