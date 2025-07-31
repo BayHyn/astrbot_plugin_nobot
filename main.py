@@ -282,8 +282,6 @@ class NobotPlugin(Star):
     async def on_waking(self, event: AstrMessageEvent):
         """收到消息后的预处理"""
         # 屏蔽特定指令
-        print(event.message_str)
-        print(self.ignore_cmds)
         if not event.is_admin() and event.message_str in self.ignore_cmds:
             event.stop_event()
             return
