@@ -18,7 +18,7 @@ from astrbot import logger
     "astrbot_plugin_nobot",
     "Zhalslar",
     "找出并禁言群里的人机!",
-    "1.0.2",
+    "1.0.3",
     "https://github.com/Zhalslar/astrbot_plugin_nobot",
 )
 class NobotPlugin(Star):
@@ -48,6 +48,8 @@ class NobotPlugin(Star):
         bot_data = bot_data_list[0] if bot_data_list else {}
         # 人机管理器
         self.bm = BotManager(bot_data, config)
+        # 忽略的命令
+        self.ignore_cmds = config.get("ignore_cmds", [])
 
     @staticmethod
     async def _get_name(event: AstrMessageEvent, user_id: str | int):
@@ -274,4 +276,14 @@ class NobotPlugin(Star):
             if self.is_delete_msg:
                 await self.delete_msg(event)
             await self.ban(event, sender_id, self.ban_duration)
+            return
+
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE, priority=99)
+    async def on_waking(self, event: AstrMessageEvent):
+        """收到消息后的预处理"""
+        # 屏蔽特定指令
+        print(event.message_str)
+        print(self.ignore_cmds)
+        if not event.is_admin() and event.message_str in self.ignore_cmds:
+            event.stop_event()
             return

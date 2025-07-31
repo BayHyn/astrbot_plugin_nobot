@@ -80,5 +80,30 @@
         "default": [
             {}
         ]
-    }
+    },
+    "ignore_cmds": {
+        "description": "忽略命令",
+        "type": "list",
+        "hint": "屏蔽非管理员发送的命令，防止被其他人机触发",
+        "default": [
+            "help",
+            "plugin",
+            "t2i",  
+            "tts",
+            "sid",
+            "op",
+            "wl",
+            "llm",
+            "provider",
+            "model",
+            "ls",
+            "new",
+            "switch",
+            "rename",
+            "reset",
+            "history",
+            "tool ls",
+            "sebsearch"
+        ]
+     }
 }
